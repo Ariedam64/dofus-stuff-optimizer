@@ -1,0 +1,350 @@
+[
+  {
+    "id": 1,
+    "typeId": 2,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Baguette Test"
+    },
+    "effects": [
+      {
+        "from": 24,
+        "to": 32,
+        "characteristic": -1,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 100
+      },
+      {
+        "from": 10,
+        "to": 12,
+        "characteristic": -1,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 96
+      },
+      {
+        "from": 50,
+        "to": 60,
+        "characteristic": 10,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      }
+    ],
+    "apCost": 4,
+    "minRange": 1,
+    "range": 6,
+    "criticalHitProbability": 30,
+    "criticalHitBonus": 5,
+    "maxCastPerTurn": 2,
+    "twoHanded": true
+  },
+  {
+    "id": 2,
+    "typeId": 82,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Bouclier Test"
+    },
+    "effects": [
+      {
+        "from": 301,
+        "to": 350,
+        "characteristic": 11,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 3,
+    "typeId": 1,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "CL>99",
+    "name": {
+      "fr": "Amulette Test"
+    },
+    "effects": [
+      {
+        "from": 301,
+        "to": 350,
+        "characteristic": 11,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      },
+      {
+        "from": -1,
+        "to": 0,
+        "characteristic": 19,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 116
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 4,
+    "typeId": 9,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Anneau Un"
+    },
+    "effects": [
+      {
+        "from": 1,
+        "to": 0,
+        "characteristic": 1,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 111
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 5,
+    "typeId": 9,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Anneau Deux"
+    },
+    "effects": [
+      {
+        "from": 20,
+        "to": 30,
+        "characteristic": 15,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 6,
+    "typeId": 10,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Ceinture Test"
+    },
+    "effects": [
+      {
+        "from": 10,
+        "to": 0,
+        "characteristic": 18,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 7,
+    "typeId": 11,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Bottes Test"
+    },
+    "effects": [
+      {
+        "from": 1,
+        "to": 0,
+        "characteristic": 23,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 128
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 101,
+    "typeId": 16,
+    "level": 100,
+    "itemSetId": 5,
+    "criterions": "",
+    "name": {
+      "fr": "Chapeau du Set"
+    },
+    "effects": [
+      {
+        "from": 100,
+        "to": 120,
+        "characteristic": 11,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 102,
+    "typeId": 17,
+    "level": 100,
+    "itemSetId": 5,
+    "criterions": "",
+    "name": {
+      "fr": "Cape du Set"
+    },
+    "effects": [
+      {
+        "from": 5,
+        "to": 0,
+        "characteristic": 16,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 112
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 8,
+    "typeId": 121,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Monture Test"
+    },
+    "effects": [
+      {
+        "from": 60,
+        "to": 0,
+        "characteristic": 11,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 9,
+    "typeId": 23,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Dofus Test"
+    },
+    "effects": [
+      {
+        "from": 10,
+        "to": 0,
+        "characteristic": 18,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 125
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  },
+  {
+    "id": 10,
+    "typeId": 217,
+    "level": 100,
+    "itemSetId": -1,
+    "criterions": "",
+    "name": {
+      "fr": "Prysmaradite Test"
+    },
+    "effects": [
+      {
+        "from": 1,
+        "to": 0,
+        "characteristic": 1,
+        "category": 0,
+        "elementId": -1,
+        "effectId": 111
+      }
+    ],
+    "apCost": null,
+    "minRange": null,
+    "range": null,
+    "criticalHitProbability": null,
+    "criticalHitBonus": null,
+    "maxCastPerTurn": null,
+    "twoHanded": false
+  }
+]

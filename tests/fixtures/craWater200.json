@@ -1,0 +1,6 @@
+{
+    "breed": "Crâ",
+    "level": 200,
+    "profile": { "elements": ["water"] },
+    "constraints": { "minAp": 11, "minMp": 6 }
+}

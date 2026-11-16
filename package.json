@@ -1,0 +1,16 @@
+{
+    "name": "dofus-stuff-optimizer",
+    "version": "1.0.0",
+    "description": "Dofus stuff optimizer CLI",
+    "main": "src/main.js",
+    "scripts": {
+        "start": "node src/main.js",
+        "test": "node --test \"tests/**/*.test.js\"",
+        "sync": "node src/main.js sync",
+        "web": "node src/main.js web"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "highs": "1.15.4"
+    }
+}

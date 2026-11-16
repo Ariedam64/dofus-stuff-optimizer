@@ -1,0 +1,203 @@
+[
+  {
+    "id": 2001,
+    "spellId": 1001,
+    "grade": 1,
+    "apCost": 4,
+    "minRange": 1,
+    "range": 8,
+    "criticalHitProbability": 25,
+    "maxCastPerTurn": 3,
+    "maxCastPerTarget": 0,
+    "minPlayerLevel": 1,
+    "effects": [
+      {
+        "effectId": 96,
+        "diceNum": 10,
+        "diceSide": 12,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A"
+      }
+    ],
+    "criticalEffect": []
+  },
+  {
+    "id": 2002,
+    "spellId": 1001,
+    "grade": 2,
+    "apCost": 4,
+    "minRange": 1,
+    "range": 8,
+    "criticalHitProbability": 25,
+    "maxCastPerTurn": 3,
+    "maxCastPerTarget": 0,
+    "minPlayerLevel": 132,
+    "effects": [
+      {
+        "effectId": 96,
+        "diceNum": 25,
+        "diceSide": 28,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A"
+      },
+      {
+        "effectId": 96,
+        "diceNum": 30,
+        "diceSide": 35,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A,E590"
+      },
+      {
+        "effectId": 5,
+        "diceNum": 2,
+        "diceSide": 0,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A"
+      },
+      {
+        "effectId": 96,
+        "diceNum": 8,
+        "diceSide": 9,
+        "triggers": "I",
+        "random": 1,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A"
+      }
+    ],
+    "criticalEffect": [
+      {
+        "effectId": 96,
+        "diceNum": 30,
+        "diceSide": 33,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A"
+      }
+    ]
+  },
+  {
+    "id": 2003,
+    "spellId": 1001,
+    "grade": 3,
+    "apCost": 4,
+    "minRange": 1,
+    "range": 8,
+    "criticalHitProbability": 25,
+    "maxCastPerTurn": 3,
+    "maxCastPerTarget": 0,
+    "minPlayerLevel": 200,
+    "effects": [
+      {
+        "effectId": 96,
+        "diceNum": 40,
+        "diceSide": 45,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A"
+      }
+    ],
+    "criticalEffect": []
+  },
+  {
+    "id": 2004,
+    "spellId": 1002,
+    "grade": 1,
+    "apCost": 4,
+    "minRange": 1,
+    "range": 8,
+    "criticalHitProbability": 25,
+    "maxCastPerTurn": 3,
+    "maxCastPerTarget": 0,
+    "minPlayerLevel": 200,
+    "effects": [
+      {
+        "effectId": 96,
+        "diceNum": 20,
+        "diceSide": 24,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A"
+      }
+    ],
+    "criticalEffect": []
+  },
+  {
+    "id": 2005,
+    "spellId": 1003,
+    "grade": 1,
+    "apCost": 4,
+    "minRange": 1,
+    "range": 8,
+    "criticalHitProbability": 25,
+    "maxCastPerTurn": 3,
+    "maxCastPerTarget": 0,
+    "minPlayerLevel": 50,
+    "effects": [
+      {
+        "effectId": 96,
+        "diceNum": 30,
+        "diceSide": 35,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "A,E590"
+      },
+      {
+        "effectId": 100,
+        "diceNum": 10,
+        "diceSide": 12,
+        "triggers": "I",
+        "random": 0,
+        "duration": 2,
+        "delay": 0,
+        "targetMask": "A"
+      }
+    ],
+    "criticalEffect": []
+  },
+  {
+    "id": 2006,
+    "spellId": 1004,
+    "grade": 1,
+    "apCost": 4,
+    "minRange": 1,
+    "range": 8,
+    "criticalHitProbability": 25,
+    "maxCastPerTurn": 3,
+    "maxCastPerTarget": 0,
+    "minPlayerLevel": 50,
+    "effects": [
+      {
+        "effectId": 100,
+        "diceNum": 15,
+        "diceSide": 0,
+        "triggers": "I",
+        "random": 0,
+        "duration": 0,
+        "delay": 0,
+        "targetMask": "a,A"
+      }
+    ],
+    "criticalEffect": []
+  }
+]

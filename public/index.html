@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="dark" />
+        <title>Optimiseur de stuff</title>
+        <link rel="icon" href="data:," />
+        <link rel="stylesheet" href="style.css" />
+        <link rel="stylesheet" href="form.css" />
+        <link rel="stylesheet" href="picker.css" />
+        <link rel="stylesheet" href="card.css" />
+        <script defer src="utils/dom.js"></script>
+        <script defer src="utils/format.js"></script>
+        <script defer src="utils/labels.js"></script>
+        <script defer src="utils/sleep.js"></script>
+        <script defer src="SseReader.js"></script>
+        <script defer src="ApiClient.js"></script>
+        <script defer src="MockApiClient.js"></script>
+        <script defer src="ItemPicker.js"></script>
+        <script defer src="SearchForm.js"></script>
+        <script defer src="StuffCard.js"></script>
+        <script defer src="ResultsView.js"></script>
+        <script defer src="app.js"></script>
+    </head>
+    <body>
+        <header class="topbar">
+            <h1 class="topbar-title">Optimiseur de stuff</h1>
+            <span id="mock-badge" class="badge badge-mock" hidden>Mode démo</span>
+            <span id="data-info" class="topbar-info"></span>
+        </header>
+
+        <main class="layout">
+            <form id="search-form" class="panel search-panel" novalidate>
+                <h2 class="panel-title">Recherche</h2>
+
+                <div class="field">
+                    <label for="breed">Classe</label>
+                    <div class="breed-picker">
+                        <img id="breed-head" class="breed-head" alt="" hidden />
+                        <select id="breed" name="breed" required></select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="level">Niveau</label>
+                    <input id="level" name="level" type="number" min="1" max="200" step="1" value="200" required />
+                </div>
+
+                <fieldset class="field">
+                    <legend>Élément</legend>
+                    <div id="element-choices" class="element-choices"></div>
+                </fieldset>
+
+                <div class="field-grid">
+                    <div class="field">
+                        <label for="min-ap">PA min</label>
+                        <input id="min-ap" type="number" min="0" max="12" step="1" value="11" inputmode="numeric" />
+                    </div>
+                    <div class="field">
+                        <label for="min-mp">PM min</label>
+                        <input id="min-mp" type="number" min="0" max="6" step="1" value="6" inputmode="numeric" />
+                    </div>
+                    <div class="field">
+                        <label for="min-critical">Critique min</label>
+                        <div class="input-suffix">
+                            <input id="min-critical" type="number" min="0" max="100" step="1" inputmode="numeric" />
+                            <span>%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <fieldset class="field">
+                    <legend>Résistances min (%)</legend>
+                    <div id="resistance-inputs" class="resistance-grid"></div>
+                </fieldset>
+
+                <label class="checkbox-field">
+                    <input id="use-scrolls" type="checkbox" checked />
+                    <span>Parchemins <small>(100 dans chaque carac)</small></span>
+                </label>
+
+                <label class="checkbox-field">
+                    <input id="ap-exo" type="checkbox" checked />
+                    <span>Exo PA sur les anneaux</span>
+                </label>
+
+                <label class="checkbox-field">
+                    <input id="mp-exo" type="checkbox" checked />
+                    <span>Exo PM sur les anneaux</span>
+                </label>
+
+                <div class="field-grid field-grid-two">
+                    <div class="field">
+                        <label for="min-different-items">Diversité</label>
+                        <input id="min-different-items" type="number" min="1" max="16" step="1" value="5" required />
+                        <small class="field-hint">items différents entre deux stuffs</small>
+                    </div>
+                    <div class="field">
+                        <label for="time-limit">Durée max</label>
+                        <div class="input-suffix">
+                            <input id="time-limit" type="number" min="5" max="300" step="1" value="60" required />
+                            <span>s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="required-items" class="field item-picker">
+                    <label for="required-input">Imposer des items</label>
+                    <ul class="chips"></ul>
+                    <div class="picker-box">
+                        <input
+                            id="required-input"
+                            type="search"
+                            placeholder="Nom d'un item…"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-autocomplete="list"
+                            aria-expanded="false"
+                        />
+                        <ul class="suggestions" role="listbox" hidden></ul>
+                    </div>
+                </div>
+
+                <div id="excluded-items" class="field item-picker">
+                    <label for="excluded-input">Exclure des items</label>
+                    <ul class="chips chips-excluded"></ul>
+                    <div class="picker-box">
+                        <input
+                            id="excluded-input"
+                            type="search"
+                            placeholder="Nom d'un item…"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-autocomplete="list"
+                            aria-expanded="false"
+                        />
+                        <ul class="suggestions" role="listbox" hidden></ul>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="launch-button" class="button button-primary" type="submit">Lancer</button>
+                    <button id="stop-button" class="button button-secondary" type="button" hidden>Arrêter</button>
+                </div>
+            </form>
+
+            <section id="results" class="results" aria-label="Stuffs trouvés">
+                <p id="status-line" class="status-line" role="status" aria-live="polite" data-state="idle">
+                    Chargement…
+                </p>
+                <ul id="notices" class="notices"></ul>
+                <ol id="stuff-list" class="stuff-list"></ol>
+                <div id="empty-state" class="empty-state">
+                    <p class="empty-title">Aucun stuff pour l'instant</p>
+                    <p>
+                        Choisis ta classe, ton élément et tes contraintes, puis lance la recherche. Les stuffs
+                        apparaissent ici au fil de l'eau, classés par dégâts.
+                    </p>
+                </div>
+            </section>
+        </main>
+    </body>
+</html>

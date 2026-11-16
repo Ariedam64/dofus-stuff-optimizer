@@ -1,0 +1,94 @@
+[
+  {
+    "id": 5,
+    "name": {
+      "fr": "Panoplie Test"
+    },
+    "items": [
+      {
+        "id": 101,
+        "typeId": 16,
+        "level": 100,
+        "itemSetId": 5,
+        "criterions": "",
+        "name": {
+          "fr": "Chapeau du Set"
+        },
+        "effects": [
+          {
+            "from": 100,
+            "to": 120,
+            "characteristic": 11,
+            "category": 0,
+            "elementId": -1,
+            "effectId": 125
+          }
+        ],
+        "apCost": null,
+        "minRange": null,
+        "range": null,
+        "criticalHitProbability": null,
+        "criticalHitBonus": null,
+        "maxCastPerTurn": null,
+        "twoHanded": false
+      },
+      {
+        "id": 102,
+        "typeId": 17,
+        "level": 100,
+        "itemSetId": 5,
+        "criterions": "",
+        "name": {
+          "fr": "Cape du Set"
+        },
+        "effects": [
+          {
+            "from": 5,
+            "to": 0,
+            "characteristic": 16,
+            "category": 0,
+            "elementId": -1,
+            "effectId": 112
+          }
+        ],
+        "apCost": null,
+        "minRange": null,
+        "range": null,
+        "criticalHitProbability": null,
+        "criticalHitBonus": null,
+        "maxCastPerTurn": null,
+        "twoHanded": false
+      }
+    ],
+    "effects": [
+      [
+        {
+          "from": 10,
+          "to": 0,
+          "characteristic": 11,
+          "category": 0,
+          "elementId": -1,
+          "effectId": 125
+        }
+      ],
+      [
+        {
+          "from": 1,
+          "to": 0,
+          "characteristic": 1,
+          "category": 0,
+          "elementId": -1,
+          "effectId": 111
+        },
+        {
+          "from": -5,
+          "to": 0,
+          "characteristic": 33,
+          "category": 0,
+          "elementId": -1,
+          "effectId": 210
+        }
+      ]
+    ]
+  }
+]
