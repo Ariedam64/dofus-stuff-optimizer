@@ -5,6 +5,8 @@ const os = require("os");
 const path = require("path");
 const config = require("../../src/config");
 const CommandLine = require("../../src/cli/CommandLine");
+const OptimizationManager = require("../../src/optimizer/OptimizationManager");
+const SolverWorkerPool = require("../../src/optimizer/SolverWorkerPool");
 
 const FIXTURES_DIR = path.join(__dirname, "..", "fixtures");
 const TEST_CONFIG = { ...config, DATA_DIR: FIXTURES_DIR, IS_DEBUG: false };
@@ -80,4 +82,21 @@ test("optimize accepts topCount as an alias of resultCount", async () => {
     assert.equal(result.results.length, ALIAS_RESULT_COUNT);
     assert.ok(result.results.every((entry) => entry.dofusbookUrl.startsWith(config.DOFUSBOOK_IMPORT_URL)));
     assert.equal(Object.hasOwn(result, "variants"), false);
+});
+
+test("optimize loads the solver workers before the search starts its clock", async (context) => {
+    const events = [];
+    const startPool = SolverWorkerPool.prototype.start;
+    context.mock.method(SolverWorkerPool.prototype, "start", async function startAndRecord() {
+        await startPool.call(this);
+        events.push("workers ready");
+    });
+    const runSearch = OptimizationManager.prototype.run;
+    context.mock.method(OptimizationManager.prototype, "run", function runAndRecord(queryJson) {
+        events.push("search");
+        return runSearch.call(this, queryJson);
+    });
+    const queryPath = await writeQueryFile(JSON.stringify(QUERY));
+    await buildCommandLine().commandLine.run(["optimize", "--query", queryPath]);
+    assert.deepEqual(events, ["workers ready", "search"]);
 });

@@ -34,7 +34,7 @@ Extrais :
     - nombre de stuffs voulus : `resultCount` (10 par défaut, de 1 à 20 ; respecte la demande de l'utilisateur dans cette plage).
     - « sans parchemins » : `useScrolls: false` (`true` par défaut).
     - diversité : `diversity.minDifferentItems` (5 par défaut, de 1 à 16) : un stuff diffère de tous les mieux classés par son arme, ou par au moins ce nombre d'objets sur 16.
-    - durée : `timeLimitMs` (60000 par défaut, de 5000 à 300000 ms ; la page web le règle en secondes, de 5 à 300). Le minimum de 5 s couvre le rechargement des données par le moteur (environ 1,6 s) et la recherche de départ.
+    - durée : `timeLimitMs`, un plafond (60000 par défaut, de 5000 à 300000 ms ; la page web le règle en secondes, de 5 à 300). La recherche est découpée par arme : chaque partie a 40 % de ce temps (au moins 20 s, au plus `timeLimitMs`), donc environ 22 à 24 s pour 60 s, moins si elles finissent plus tôt ; une partie encore sans stuff à son échéance continue d'en chercher un jusqu'à `timeLimitMs`. Les données sont chargées avant que le temps ne coure ; le minimum de 5 s couvre la recherche de départ.
 
 Si la classe ou le niveau manque, pose la question et attends la réponse. Si l'élément manque, demande-le aussi. Le moteur ne gère qu'un seul élément par requête : pour un stuff multi-éléments, explique la limite et propose de calculer chaque élément séparément.
 
@@ -78,7 +78,7 @@ Tous les champs de `constraints`, `ringExos` (et chacune de ses clés), `resultC
 node src/main.js optimize --query queries/last-query.json
 ```
 
-Le calcul dure jusqu'à `timeLimitMs` (environ 55 à 60 s par défaut) : utilise un timeout Bash d'au moins 120000 ms (davantage si tu augmentes `timeLimitMs`) et préviens l'utilisateur que le calcul est en cours. Le JSON est sur stdout, les messages de statut sur stderr.
+Le calcul dure au plus `timeLimitMs`, plus quelques secondes de chargement des données (environ 25 à 30 s en tout par défaut) : utilise un timeout Bash d'au moins 120000 ms (davantage si tu augmentes `timeLimitMs`) et préviens l'utilisateur que le calcul est en cours. Le moteur lance jusqu'à 4 workers de calcul (environ 1,2 Go de mémoire pendant une recherche, pic d'environ 3 Go au démarrage). Le JSON est sur stdout, les messages de statut sur stderr.
 
 Erreurs :
 
@@ -119,7 +119,7 @@ Chaque élément de `results` (trié du meilleur au moins bon par `score`, `resu
 ## 6. Statut de preuve (`solverStatus`, `isOptimal`, `reason`)
 
 - `solverStatus` : `"optimal"` = « optimum prouvé » ; `"gap"` = « à au plus x % du meilleur possible » ; `"heuristic"` = « meilleur stuff trouvé, optimum non prouvé » (cas habituel). `isOptimal: true` signifie que tout le résultat est prouvé.
-- `reason` non nul : `no-valid-stuff` (avec `results` vide) = prouvé impossible, aucune combinaison ne respecte les contraintes (suggère de les assouplir) ; `time-limit-reached` = la recherche a été coupée par le temps imparti sans preuve : sans stuff, rien n'a été trouvé (ce n'est pas une preuve d'impossibilité, suggère d'allonger `timeLimitMs` ou d'assouplir) ; avec des stuffs, ils ne sont pas tous prouvés : la recherche a été coupée par le temps imparti ou le solveur HiGHS a échoué et le moteur a rendu les meilleurs stuffs déjà trouvés (il peut y en avoir autant que `resultCount`).
+- `reason` non nul : `no-valid-stuff` (avec `results` vide) = prouvé impossible, aucune combinaison ne respecte les contraintes (suggère de les assouplir) ; `time-limit-reached` = la recherche a été coupée par le temps imparti sans preuve : sans stuff, rien n'a été trouvé (ce n'est pas une preuve d'impossibilité, suggère d'allonger `timeLimitMs` ou d'assouplir) ; avec des stuffs, ils ne sont pas tous prouvés : la recherche a été coupée par le temps imparti, ou le solveur HiGHS a échoué et le moteur a rendu les meilleurs stuffs déjà trouvés (il peut y en avoir autant que `resultCount`), ou une partie de la recherche découpée par arme a échoué (message `❌` sur stderr) : les stuffs des autres parties sont gardés, tous non prouvés.
 
 ## 7. Avertissements
 

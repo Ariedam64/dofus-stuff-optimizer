@@ -9,7 +9,7 @@ const { LOCALHOST, JSON_HEADERS, StubManager, startServer, postJson } = require(
 const WAIT_TIMEOUT_MS = 2000;
 const POLL_MS = 10;
 const OVERSIZED_BODY_BYTES = 1024 * 1024 + 1;
-const DONE_KEYS = ["isOptimal", "reason", "unsupportedItems", "unobtainableItems", "ignoredSpells"];
+const DONE_KEYS = ["isOptimal", "reason", "unsupportedItems", "unobtainableItems", "ignoredSpells", "results"];
 
 function rawGet(url, rawPath) {
     const { hostname, port } = new URL(url);
@@ -94,6 +94,7 @@ test("POST /api/optimize streams stuff events then done", async (context) => {
     assert.match(text, /event: stuff\ndata: \{"rank":1,"stuff":\{"score":10\}\}/);
     const done = JSON.parse(text.match(/event: done\ndata: (.*)\n/)[1]);
     assert.deepEqual(Object.keys(done), DONE_KEYS);
+    assert.deepEqual(done.results, [{ score: 10 }, { score: 9 }]);
 });
 
 test("a second POST aborts the first search", async (context) => {
@@ -179,4 +180,11 @@ test("server logs go to the injected logger", async (context) => {
     context.after(() => server.stop());
     assert.equal(messages.length, 1);
     assert.match(messages[0], /^✅ Page ouverte sur http:\/\/127\.0\.0\.1:\d+$/);
+});
+
+test("stop closes the manager and its solver workers", async () => {
+    const manager = new StubManager();
+    const { server } = await startServer(manager);
+    await server.stop();
+    assert.equal(manager.isClosed, true);
 });

@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const StuffSolver = require("../../src/solver/StuffSolver");
 const { CHARACTERISTIC } = require("../../src/stats/characteristics");
 const { SLOT } = require("../../src/data/slots");
-const { buildRandomCase } = require("./randomCases");
+const { buildRandomCase, RANDOM_CASE_COUNT, FIRST_SEED } = require("./randomCases");
 const {
     buildSpell,
     buildItem,
@@ -15,8 +15,6 @@ const {
     collect,
 } = require("./solverFixture");
 
-const RANDOM_CASE_COUNT = 24;
-const FIRST_SEED = 1000;
 const LONG_DEADLINE_MS = 120000;
 const SCORE_TOLERANCE = 1e-6;
 const DIVERSE_RESULT_COUNT = 4;
@@ -59,6 +57,7 @@ test("first yield matches the brute-force optimum on random fixtures", async () 
         assertSameScore(first.evaluation.score, best.score, `seed ${seed}: ${first.evaluation.score} vs ${best.score}`);
         assert.equal(first.solverStatus, "optimal", `seed ${seed}`);
         assert.equal(first.optimalityGapPercent, 0, `seed ${seed}`);
+        assertSameScore(first.upperBound, best.score, `seed ${seed}: bound ${first.upperBound}`);
     }
 });
 
@@ -129,15 +128,33 @@ test("a deadline already passed yields at most the warm start, never as optimal"
     const context = buildSimpleContext();
     const warmItems = [context.candidates.get(SLOT.HAT)[0]];
     const solver = buildSolver(context);
-    const yields = await collect(solver.solveDiverse({ deadlineMs: Date.now() - PAST_MS, warmStart: [warmItems] }));
+    // A search already holding a stuff keeps its own deadline, however late the latest one is.
+    const yields = await collect(
+        solver.solveDiverse({
+            deadlineMs: Date.now() - PAST_MS,
+            latestDeadlineMs: Date.now() + LONG_DEADLINE_MS,
+            warmStart: [warmItems],
+        }),
+    );
     assert.ok(yields.length <= 1);
     for (const result of yields) {
         assert.notEqual(result.solverStatus, "optimal");
+        assert.equal(result.upperBound, null);
         assert.deepEqual(
             result.evaluation.items.map((item) => item.id),
             warmItems.map((item) => item.id),
         );
     }
+});
+
+test("a search without any stuff at its deadline looks for a first one until the latest deadline", async () => {
+    const solver = buildSolver(buildSimpleContext({ resultCount: DIVERSE_RESULT_COUNT, minDifferentItems: 1 }));
+    const yields = await collect(
+        solver.solveDiverse({ deadlineMs: Date.now() - PAST_MS, latestDeadlineMs: Date.now() + LONG_DEADLINE_MS }),
+    );
+    // Once it holds that stuff, the search keeps its own deadline, already passed.
+    assert.equal(yields.length, 1);
+    assert.equal(solver.endReason, StuffSolver.END_REASON.DEADLINE);
 });
 
 test("a pk trophy keeps every set at two items at most", async () => {

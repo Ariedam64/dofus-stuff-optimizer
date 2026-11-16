@@ -63,6 +63,11 @@ const CONSTRAINT_CHOICES = [
 ];
 const CAST_INTERVAL_CHANCE = 0.25;
 const SET_ID = 77;
+const RANDOM_CASE_COUNT = 24;
+const FIRST_SEED = 1000;
+// Seeds whose valid stuffs include raw AP totals above the cap once AP and MP item stats are scaled up.
+const HIGH_AP_SEEDS = [3001, 3002, 3007, 3009, 3010, 3011, 3014, 3015];
+const HIGH_AP_SCALE = 6;
 const SET_ITEM_COUNT = 3;
 const PK_TROPHY_CHANCE = 0.4;
 
@@ -210,4 +215,43 @@ function buildRandomCase(seed, { ringExos, apScale } = {}) {
     });
 }
 
-module.exports = { buildRandomCase };
+// The random seeds, then the high AP seeds.
+function listRandomCases() {
+    const cases = [];
+    for (let index = 0; index < RANDOM_CASE_COUNT; index++) {
+        const seed = FIRST_SEED + index;
+        cases.push({ label: `seed ${seed}`, context: buildRandomCase(seed) });
+    }
+    for (const seed of HIGH_AP_SEEDS) {
+        cases.push({ label: `high AP seed ${seed}`, context: buildRandomCase(seed, { apScale: HIGH_AP_SCALE }) });
+    }
+    return cases;
+}
+
+// The problem MilpModelBuilder, BoundTightener and StuffSolver share.
+function toProblem({ candidates, query, gameData, evaluator }) {
+    return {
+        candidates,
+        query,
+        gameData,
+        spellGroups: evaluator.buildActionGroups(null),
+        baseStats: evaluator.baseStats,
+    };
+}
+
+function weigh(stats, weights) {
+    let total = 0;
+    for (const [characteristic, weight] of weights) total += weight * stats.get(characteristic);
+    return total;
+}
+
+module.exports = {
+    buildRandomCase,
+    listRandomCases,
+    toProblem,
+    weigh,
+    RANDOM_CASE_COUNT,
+    FIRST_SEED,
+    HIGH_AP_SEEDS,
+    HIGH_AP_SCALE,
+};

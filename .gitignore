@@ -4,3 +4,4 @@ node_modules/
 /data/
 /queries/
 /.superpowers/
+/bench-results/

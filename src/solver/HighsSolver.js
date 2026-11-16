@@ -36,15 +36,21 @@ class HighsSolver {
         this.#model = model;
     }
 
-    static async create(lpText) {
+    // options: HiGHS options added to the defaults.
+    static async create(lpText, options = {}) {
         highsLoading ??= loadHighs().catch((error) => {
             highsLoading = null;
             throw new Error(`Cannot load the HiGHS solver: ${error.message}`);
         });
         const highs = await highsLoading;
         const model = highs.createModel({ format: "lp", data: lpText });
-        model.options.set(SOLVER_OPTIONS);
+        model.options.set({ ...SOLVER_OPTIONS, ...options });
         return new HighsSolver(highs, model);
+    }
+
+    // Sum of the reduced costs and row duals of the wrong sign after an LP solve, 0 at an exact optimum.
+    get dualInfeasibility() {
+        return this.#model.info.get("sum_dual_infeasibilities");
     }
 
     columnOf(name) {
@@ -60,6 +66,13 @@ class HighsSolver {
         return name;
     }
 
+    // Replaces the whole (maximized) objective; the next solve starts from the current basis.
+    setObjective(expression) {
+        const costs = new Float64Array(this.#model.getDimensions().numCols);
+        for (const [name, coefficient] of expression.terms) costs[this.columnOf(name)] = coefficient;
+        this.#model.changeColsCost({ kind: "range", from: 0, to: costs.length - 1 }, costs);
+    }
+
     addConstraint(expression, sense, rhs = 0) {
         const terms = expression.terms;
         const [lower, upper] = toRowBounds(sense, rhs - expression.constant);
@@ -69,8 +82,9 @@ class HighsSolver {
         });
     }
 
-    // start: Map<variable name, value>, a partial MIP start completed by HiGHS.
-    solve({ timeLimitMs, start = null }) {
+    // start: Map<variable name, value>, a partial MIP start completed by HiGHS. Once stopAtSolutionAfterMs is over, a
+    // MIP solve stops as soon as it holds a feasible solution.
+    solve({ timeLimitMs, start = null, stopAtSolutionAfterMs = Infinity }) {
         this.#model.options.set({ time_limit: Math.max(MIN_TIME_LIMIT_SECONDS, timeLimitMs / MS_PER_SECOND) });
         this.#model.zeroAllClocks();
         if (start) {
@@ -80,18 +94,24 @@ class HighsSolver {
                 values: entries.map(([, value]) => value),
             });
         }
-        this.#model.run(this.#buildDeadlineCallbacks(Date.now() + timeLimitMs));
+        const startMs = Date.now();
+        this.#model.run(this.#buildDeadlineCallbacks(startMs + timeLimitMs, startMs + stopAtSolutionAfterMs));
         return this.#readResult();
     }
 
     // HiGHS checks time_limit only at some points; these checkpoints enforce the wall-clock deadline as well.
-    #buildDeadlineCallbacks(deadlineMs) {
+    #buildDeadlineCallbacks(deadlineMs, solutionDeadlineMs) {
         const interruptLate = (event) => {
             if (Date.now() >= deadlineMs) event.interrupt();
         };
+        const interruptLateMip = (event) => {
+            const hasSolution = Number.isFinite(event.data.mip_primal_bound);
+            const nowMs = Date.now();
+            if (nowMs >= deadlineMs || (hasSolution && nowMs >= solutionDeadlineMs)) event.interrupt();
+        };
         const { callbackType } = this.#highs.constants;
         return {
-            [callbackType.mipInterrupt]: interruptLate,
+            [callbackType.mipInterrupt]: interruptLateMip,
             [callbackType.simplexInterrupt]: interruptLate,
         };
     }

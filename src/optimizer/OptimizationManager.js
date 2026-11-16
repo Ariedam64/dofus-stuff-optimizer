@@ -1,18 +1,15 @@
 const SearchContext = require("./SearchContext");
 const ResultFormatter = require("./ResultFormatter");
-const SolverWorkerClient = require("./SolverWorkerClient");
-const StuffSolver = require("../solver/StuffSolver");
-const { SOLVER_MESSAGE } = require("./solverMessages");
+const SolverWorkerPool = require("./SolverWorkerPool");
+const WeaponPartitioner = require("./WeaponPartitioner");
+const PartitionedSearch = require("./PartitionedSearch");
+const Optimality = require("../solver/Optimality");
 
 const REASON = Object.freeze({ NO_VALID_STUFF: "no-valid-stuff", TIME_LIMIT: "time-limit-reached" });
-const NO_OUTCOME = null;
 const NO_STUFF = 0;
+const { SINGLE_JOB } = WeaponPartitioner;
 
 function ignoreEvent() {}
-
-function compareScoresDescending(first, second) {
-    return second.score - first.score;
-}
 
 class OptimizationManager {
     static REASON = REASON;
@@ -21,19 +18,36 @@ class OptimizationManager {
     #config;
     #logger;
     #solverRunner;
+    #workerPool = null;
 
+    // Without a solverRunner, searches run in a SolverWorkerPool created on first use and released by close().
     constructor({ gameData, config, logger = console, solverRunner = null }) {
         this.#gameData = gameData;
         this.#config = config;
         this.#logger = logger;
-        this.#solverRunner = solverRunner ?? new SolverWorkerClient({ config });
+        this.#solverRunner = solverRunner;
+    }
+
+    // Loads the solver workers ahead of the first search.
+    async startWorkers() {
+        if (this.#solverRunner) return;
+        await this.#getWorkerPool().start();
+    }
+
+    async close() {
+        const workerPool = this.#workerPool;
+        this.#workerPool = null;
+        await workerPool?.close();
     }
 
     run(queryJson) {
         return this.runStreaming(queryJson);
     }
 
-    // Stuffs are streamed in the order found; the final results are sorted by exact score.
+    // The search is split by weapon across the solver runner (see PartitionedSearch); a runner that does not tell how
+    // many jobs it runs at once gets one search, not split. Stuffs are streamed once their status is settled, in no
+    // particular order, and a streamed stuff may later be pushed out of the list; the final results are the best
+    // resultCount, sorted by exact score.
     async runStreaming(queryJson, { onStuff = ignoreEvent, onProgress = ignoreEvent, signal = null } = {}) {
         const startMs = Date.now();
         const context = new SearchContext(queryJson, this.#gameData);
@@ -44,73 +58,91 @@ class OptimizationManager {
             gameData: this.#gameData,
             maxReportedGapPercent: this.#config.MAX_REPORTED_GAP_PERCENT,
         });
-        const search = { context, formatter, startMs, found: [], outcome: NO_OUTCOME, callbackError: null };
+        const progress = { streamedCount: NO_STUFF, callbackError: null };
         const stopController = new AbortController();
         // The timer callback cannot throw to the caller: a listener error stops the search and is rethrown below.
         const reportProgress = () => {
             try {
-                onProgress({ elapsedMs: Date.now() - startMs, foundCount: search.found.length });
+                const foundCount = Math.min(progress.streamedCount, context.query.resultCount);
+                onProgress({ elapsedMs: Date.now() - startMs, foundCount });
             } catch (error) {
-                search.callbackError ??= error;
+                progress.callbackError ??= error;
                 stopController.abort();
             }
         };
+        const sendStuff = (stuff) => {
+            progress.streamedCount++;
+            onStuff(progress.streamedCount, formatter.formatStuff(stuff));
+            reportProgress();
+        };
         const progressTimer = setInterval(reportProgress, this.#config.PROGRESS_INTERVAL_MS);
+        let search;
         try {
             const signals = [signal, stopController.signal].filter(Boolean);
-            for await (const message of this.#startSolver(queryJson, context.query, startMs, signals)) {
-                this.#handleMessage(search, message, { onStuff, reportProgress });
-            }
+            search = await this.#search(queryJson, context, { startMs, signals, onStuff: sendStuff });
         } finally {
             clearInterval(progressTimer);
         }
-        if (search.callbackError) throw search.callbackError;
-        return this.#buildResult(search);
+        if (progress.callbackError) throw progress.callbackError;
+        return this.#buildResult({ context, formatter, search, startMs });
     }
 
-    #startSolver(queryJson, query, startMs, signals) {
-        const { WARM_START_TIME_RATIO, MIN_WARM_START_TIME_MS, DEADLINE_GRACE_MS } = this.#config;
-        const hardStop = AbortSignal.timeout(query.timeLimitMs + DEADLINE_GRACE_MS);
-        return this.#solverRunner.run({
-            queryJson,
-            deadlineMs: startMs + query.timeLimitMs,
-            warmStartTimeMs: Math.max(query.timeLimitMs * WARM_START_TIME_RATIO, MIN_WARM_START_TIME_MS),
-            signal: AbortSignal.any([...signals, hardStop]),
+    async #search(queryJson, context, { startMs, signals, onStuff }) {
+        const runner = this.#getSolverRunner();
+        const groups = new WeaponPartitioner(context).partition(runner.size ?? SINGLE_JOB);
+        this.#logDebug(`Weapon groups: ${groups.map((group) => group.weaponIds?.length ?? "all").join(", ")}`);
+        const search = new PartitionedSearch({ runner, context, groups, logger: this.#logger });
+        const { timeLimitMs } = context.query;
+        await search.run(this.#buildJob(queryJson, timeLimitMs, { startMs, groupCount: groups.length }), {
+            signal: this.#withHardStop(timeLimitMs, signals),
+            onStuff,
         });
+        return search;
     }
 
-    #handleMessage(search, message, { onStuff, reportProgress }) {
-        if (message.type === SOLVER_MESSAGE.DONE) {
-            search.outcome = message;
-            return;
-        }
-        const stuff = this.#rescore(search, message);
-        if (!stuff) return;
-        search.found.push(stuff);
-        onStuff(search.found.length, stuff.formatted);
-        reportProgress();
+    // A partition without any stuff at its deadline may run on until the time limit for a first one.
+    #buildJob(queryJson, timeLimitMs, { startMs, groupCount }) {
+        const { WARM_START_TIME_RATIO, MIN_WARM_START_TIME_MS } = this.#config;
+        const partitionTimeMs = groupCount > SINGLE_JOB ? this.#computeSplitTimeMs(timeLimitMs) : timeLimitMs;
+        return {
+            queryJson,
+            deadlineMs: startMs + partitionTimeMs,
+            latestDeadlineMs: startMs + timeLimitMs,
+            warmStartTimeMs: Math.max(partitionTimeMs * WARM_START_TIME_RATIO, MIN_WARM_START_TIME_MS),
+        };
     }
 
-    // The solver only proposes: the exact evaluator of this thread gives every displayed number.
-    #rescore({ context, formatter }, { itemIds, solverStatus, optimalityGapPercent }) {
-        const evaluation = context.evaluator.evaluate(context.findItems(itemIds));
-        if (!evaluation) {
-            this.#logger.error(`❌ Solver stuff [${itemIds.join(", ")}] is invalid for the exact evaluator, skipped`);
-            return null;
-        }
-        const formatted = formatter.formatStuff({ evaluation, solverStatus, optimalityGapPercent });
-        return { score: evaluation.score, formatted };
+    // Each partition of a split search gets SPLIT_SEARCH_TIME_SHARE of the time limit, but at least
+    // MIN_PARTITION_TIME_MS and never more than the limit, so that a longer limit never gives a shorter search.
+    #computeSplitTimeMs(timeLimitMs) {
+        const { SPLIT_SEARCH_TIME_SHARE, MIN_PARTITION_TIME_MS } = this.#config;
+        return Math.min(timeLimitMs, Math.max(timeLimitMs * SPLIT_SEARCH_TIME_SHARE, MIN_PARTITION_TIME_MS));
     }
 
-    #buildResult({ context, formatter, found, outcome, startMs }) {
-        const results = found.sort(compareScoresDescending).map((stuff) => stuff.formatted);
-        const isCut = !outcome?.isComplete;
-        const isInfeasible = results.length === NO_STUFF && outcome?.isInfeasible === true;
-        const isEveryStuffOptimal = results.every((stuff) => stuff.solverStatus === StuffSolver.SOLVER_STATUS.OPTIMAL);
+    #withHardStop(timeLimitMs, signals) {
+        const hardStop = AbortSignal.timeout(timeLimitMs + this.#config.DEADLINE_GRACE_MS);
+        return AbortSignal.any([...signals, hardStop]);
+    }
+
+    #getSolverRunner() {
+        return this.#solverRunner ?? this.#getWorkerPool();
+    }
+
+    #getWorkerPool() {
+        this.#workerPool ??= new SolverWorkerPool({ config: this.#config, logger: this.#logger });
+        return this.#workerPool;
+    }
+
+    #buildResult({ context, formatter, search, startMs }) {
+        const results = search.listResults().map((stuff) => formatter.formatStuff(stuff));
+        const { isComplete, isInfeasible } = search.outcome;
+        const isCut = !isComplete;
+        const isProvenEmpty = results.length === NO_STUFF && isInfeasible;
+        const isEveryStuffOptimal = results.every((stuff) => stuff.solverStatus === Optimality.SOLVER_STATUS.OPTIMAL);
         return {
             isOptimal: !isCut && isEveryStuffOptimal,
             elapsedMs: Date.now() - startMs,
-            reason: this.#explainOutcome(results.length, isInfeasible, isCut),
+            reason: this.#explainOutcome(results.length, isProvenEmpty, isCut),
             dataSyncedAt: this.#gameData.dataSyncedAt,
             ignoredSpells: context.listIgnoredSpells(),
             unsupportedItems: formatter.formatItemList(context.filter.unsupportedItems),
@@ -120,8 +152,8 @@ class OptimizationManager {
     }
 
     // Only a HiGHS infeasibility proof may claim that no stuff exists; an empty search cut by time proves nothing.
-    #explainOutcome(foundCount, isInfeasible, isCut) {
-        if (isInfeasible) return REASON.NO_VALID_STUFF;
+    #explainOutcome(foundCount, isProvenEmpty, isCut) {
+        if (isProvenEmpty) return REASON.NO_VALID_STUFF;
         if (foundCount === NO_STUFF || isCut) return REASON.TIME_LIMIT;
         return null;
     }

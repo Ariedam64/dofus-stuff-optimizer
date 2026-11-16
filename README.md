@@ -21,13 +21,13 @@ npm run sync
 npm run web
 ```
 
-Le serveur écoute sur `127.0.0.1:5173` et ouvre le navigateur. Il ne répond qu'à sa propre page : une requête venant d'un autre site (en-tête `Origin` ou `Host` étranger) ou un `POST /api/optimize` qui n'est pas en `Content-Type: application/json` est refusé. Le formulaire (classe, niveau, élément, PA et PM minimaux, résistances, critique, parchemins, exo PA et exo PM sur les anneaux, diversité, objets imposés ou exclus) est à gauche ; les stuffs apparaissent à droite au fil de l'eau, avec leurs icônes, leurs stats clés, leur combo du tour et un bouton Dofusbook. Une seule recherche à la fois : en lancer une nouvelle annule la précédente. Une requête impossible (objets imposés incompatibles, objet au-dessus du niveau, champ invalide) est refusée tout de suite avec un message en français.
+Le serveur écoute sur `127.0.0.1:5173` et ouvre le navigateur. Il ne répond qu'à sa propre page : une requête venant d'un autre site (en-tête `Origin` ou `Host` étranger) ou un `POST /api/optimize` qui n'est pas en `Content-Type: application/json` est refusé. Le formulaire (classe, niveau, élément, PA et PM minimaux, résistances, critique, parchemins, exo PA et exo PM sur les anneaux, diversité, objets imposés ou exclus) est à gauche ; les stuffs apparaissent à droite au fil de l'eau, avec leurs icônes, leurs stats clés, leur combo du tour et un bouton Dofusbook. Une seule recherche à la fois : en lancer une nouvelle annule la précédente. Une requête impossible (objets imposés incompatibles, objet au-dessus du niveau, champ invalide) est refusée tout de suite avec un message en français. Le serveur garde jusqu'à 4 workers de calcul préchargés, chacun avec sa copie des données : environ 220 Mo de mémoire au repos, 1,2 Go pendant une recherche, avec un pic d'environ 3 Go pendant quelques secondes au démarrage.
 
 Ouvrir un lien Dofusbook remplace le brouillon Dofusbook local de votre navigateur.
 
 ### Ligne de commande
 
-Le résultat JSON est écrit sur la sortie standard (environ 55 à 60 s avec les réglages par défaut) :
+Le résultat JSON est écrit sur la sortie standard. Avec les réglages par défaut, la recherche dure environ 22 à 24 s (voir `timeLimitMs`), après le chargement des données :
 
 ```
 npm start -- optimize --query tests/fixtures/craWater200.json
@@ -64,7 +64,7 @@ npm start -- optimize --query tests/fixtures/craWater200.json
 - `resultCount` : nombre de stuffs renvoyés (10 par défaut, de 1 à 20). `topCount` reste accepté comme ancien nom.
 - `useScrolls` : parchemins de +100 dans chacune des 6 caractéristiques (vrai par défaut).
 - `diversity.minDifferentItems` : un stuff diffère des mieux classés par son arme, ou par au moins ce nombre d'objets sur 16 (5 par défaut, de 1 à 16).
-- `timeLimitMs` : durée maximale de la recherche (60000 par défaut, de 5000 à 300000 ms ; la page le règle en secondes, de 5 à 300). Le minimum de 5 s couvre le rechargement des données par le moteur (environ 1,6 s) et la recherche de départ.
+- `timeLimitMs` : plafond de la durée de la recherche (60000 par défaut, de 5000 à 300000 ms ; la page le règle en secondes, de 5 à 300). La recherche est découpée par arme entre les workers de calcul (jusqu'à 4) : chaque partie a 40 % de ce temps, au moins 20 s et au plus `timeLimitMs`, et la recherche se termine quand toutes ses parties ont fini. Elle dure donc environ 22 à 24 s pour 60 s, moins si toutes les parties finissent plus tôt. Une partie qui n'a encore aucun stuff à son échéance continue d'en chercher un, jusqu'à `timeLimitMs` au plus. Les données sont chargées avant que le temps ne coure : la page garde ses workers préchargés, la ligne de commande les charge avant de lancer la recherche. Le minimum de 5 s couvre la recherche de départ.
 
 ### Points de caractéristiques
 
@@ -81,6 +81,7 @@ La sortie contient `isOptimal`, `elapsedMs`, `reason`, `dataSyncedAt`, les stuff
 - `solverStatus: "optimal"` : optimum prouvé ; `"gap"` : non prouvé, les dégâts sont à au plus `optimalityGapPercent` % (10 % au plus) du meilleur possible ; `"heuristic"` : meilleur stuff trouvé, non prouvé.
 - `reason: "no-valid-stuff"` : aucune combinaison ne respecte les contraintes (prouvé) ; `"time-limit-reached"` : recherche coupée par le temps imparti, sans preuve.
 - Si le solveur HiGHS échoue (chargement impossible, erreur interne), un message `❌` est écrit sur stderr et la recherche rend les meilleurs stuffs déjà trouvés, en `"heuristic"`, avec `reason: "time-limit-reached"`.
+- Si une partie de la recherche découpée par arme échoue (worker planté, erreur), un message `❌` est écrit sur stderr et la recherche garde les stuffs des autres parties : aucun n'est alors prouvé (`"heuristic"`) et `reason` vaut `"time-limit-reached"`. La recherche n'échoue que si toutes ses parties échouent.
 - Les objets dominés sont écartés avant la recherche : les stuffs sont construits avec les objets non dominés.
 
 ## Agent Claude Code

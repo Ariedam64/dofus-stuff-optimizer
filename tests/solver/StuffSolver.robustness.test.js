@@ -98,6 +98,7 @@ function assertAllUnproven(yields) {
     for (const [index, result] of yields.entries()) {
         assert.equal(result.solverStatus, "heuristic", `yield ${index + 1}`);
         assert.equal(result.optimalityGapPercent, null, `yield ${index + 1}`);
+        assert.equal(result.upperBound, null, `yield ${index + 1}`);
     }
 }
 

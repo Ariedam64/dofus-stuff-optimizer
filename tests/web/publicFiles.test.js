@@ -102,15 +102,24 @@ function loadResultsView() {
     return vm.runInContext("ResultsView", context);
 }
 
-function finishSearchWithNodes({ stuffs = [], done }) {
+function startSearch(resultCount) {
     const ResultsView = loadResultsView();
     const nodes = new Map(RESULTS_VIEW_SELECTORS.map((selector) => [selector, createFakeElement()]));
     const root = { querySelector: (selector) => nodes.get(selector) };
     const view = new ResultsView({ root, elements: [WATER_ELEMENT] });
-    view.start(WATER_ELEMENT.key);
+    view.start(WATER_ELEMENT.key, resultCount);
+    return { view, nodes };
+}
+
+function finishSearchWithNodes({ stuffs = [], done, resultCount }) {
+    const { view, nodes } = startSearch(resultCount);
     for (const stuff of stuffs) view.addStuff(stuff);
     view.finish(done);
     return nodes;
+}
+
+function listCardTexts(nodes) {
+    return nodes.get("#stuff-list").children.map((child) => child.textContent);
 }
 
 function finishSearch(options) {
@@ -296,4 +305,21 @@ test("the gap badge says how far the stuff can be from the best possible one", (
     const badge = buildCardBadge(gapStuff);
     const gap = gapStuff.optimalityGapPercent.toLocaleString("fr-FR");
     assert.equal(badge.attributes.title, `Dégâts à au plus ${gap}\u00A0% du meilleur possible.`);
+});
+
+test("the page keeps only the resultCount best cards while stuffs stream in", () => {
+    const { view, nodes } = startSearch(2);
+    for (const score of [10, 30, 20, 5]) view.addStuff({ score, solverStatus: "heuristic" });
+    view.updateProgress({ foundCount: 4 });
+    const runningStatus = nodes.get("#status-line").textContent;
+    view.showStopped();
+    assert.deepEqual(listCardTexts(nodes), ["#1", "#2"]);
+    assert.match(runningStatus, /2 stuffs/);
+});
+
+test("the final results of done replace the streamed cards", () => {
+    const done = { isOptimal: true, reason: null, results: [OPTIMAL_STUFF] };
+    const nodes = finishSearchWithNodes({ stuffs: [GAP_STUFF, { score: 100, solverStatus: "heuristic" }], done });
+    assert.deepEqual(listCardTexts(nodes), ["#1"]);
+    assert.match(nodes.get("#status-line").textContent, new RegExp(PROVEN_LIST_TEXT));
 });

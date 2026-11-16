@@ -47,7 +47,7 @@ class App {
         const controller = new AbortController();
         this.#searchController = controller;
         this.#form.isRunning = true;
-        this.#results.start(query.profile.elements[0]);
+        this.#results.start(query.profile.elements[0], query.resultCount);
         try {
             await this.#api.optimize(query, {
                 signal: controller.signal,

@@ -98,6 +98,11 @@ class WebServer {
 
     async stop() {
         this.#currentSearch?.abort();
+        await this.#closeServer();
+        await this.#manager.close();
+    }
+
+    async #closeServer() {
         if (!this.#server) return;
         const server = this.#server;
         this.#server = null;
@@ -239,9 +244,10 @@ data: ${JSON.stringify(data)}
 `);
     }
 
+    // The final results replace the streamed stuffs: a streamed stuff may have been pushed out of the list since.
     #pickDonePayload(result) {
-        const { isOptimal, reason, unsupportedItems, unobtainableItems, ignoredSpells } = result;
-        return { isOptimal, reason, unsupportedItems, unobtainableItems, ignoredSpells };
+        const { isOptimal, reason, unsupportedItems, unobtainableItems, ignoredSpells, results } = result;
+        return { isOptimal, reason, unsupportedItems, unobtainableItems, ignoredSpells, results };
     }
 
     // The page shows the French message; the code is kept for clients that want to react to one error kind.

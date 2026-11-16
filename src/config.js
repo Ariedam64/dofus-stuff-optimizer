@@ -39,6 +39,17 @@ const PROGRESS_INTERVAL_MS = 1000;
 const SOLVER_DEADLINE_MARGIN_MS = 1500;
 // The solver worker is terminated if it is still running this long after the deadline.
 const DEADLINE_GRACE_MS = 3000;
+// Cap of the LP bound tightening of the stats before the exact model is built.
+const MAX_BOUND_TIGHTENING_MS = 2000;
+// Persistent solver worker threads, each holding its own copy of the game data; the pool also leaves one core free.
+const MAX_SOLVER_WORKERS = 4;
+// A search split by weapon (one partition per worker) gives each partition this share of the time limit; a partition
+// still without a stuff by then runs on until the whole limit for a first one. A larger share made the split search
+// slower than a single one on the benchmark, since it lasts as long as its slowest partition.
+const SPLIT_SEARCH_TIME_SHARE = 0.4;
+// Least time of a split search's partition, capped by the time limit: 20 s partitions already reach the benchmark's
+// best stuffs, while 8 s ones (the share of a 20 s limit) gave clearly worse ones.
+const MIN_PARTITION_TIME_MS = 20000;
 const WEB_HOST = "127.0.0.1";
 const WEB_PORT = 5173;
 const DOFUSBOOK_IMPORT_URL = "https://www.dofusbook.net/desktop/fr/equipement/roxx-solver/objets?stuff=";
@@ -74,6 +85,10 @@ module.exports = {
     PROGRESS_INTERVAL_MS,
     SOLVER_DEADLINE_MARGIN_MS,
     DEADLINE_GRACE_MS,
+    MAX_BOUND_TIGHTENING_MS,
+    MAX_SOLVER_WORKERS,
+    SPLIT_SEARCH_TIME_SHARE,
+    MIN_PARTITION_TIME_MS,
     WEB_HOST,
     WEB_PORT,
     DOFUSBOOK_IMPORT_URL,

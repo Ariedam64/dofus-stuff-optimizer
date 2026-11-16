@@ -1,32 +1,28 @@
 const { setImmediate: yieldToEventLoop } = require("timers/promises");
 const MilpModelBuilder = require("./MilpModelBuilder");
+const BoundTightener = require("./BoundTightener");
 const HighsSolver = require("./HighsSolver");
 const CutBuilder = require("./CutBuilder");
 const DiversityRule = require("./DiversityRule");
 const HeuristicSearch = require("./HeuristicSearch");
 const StuffValidator = require("./StuffValidator");
-const { IS_DEBUG, SOLVER_DEADLINE_MARGIN_MS } = require("../config");
+const Optimality = require("./Optimality");
+const { IS_DEBUG, SOLVER_DEADLINE_MARGIN_MS, MAX_BOUND_TIGHTENING_MS } = require("../config");
 
-const SOLVER_STATUS = Object.freeze({ OPTIMAL: "optimal", GAP: "gap", HEURISTIC: "heuristic" });
+const { SOLVER_STATUS, isClearlyBelow } = Optimality;
 // Why solveDiverse stopped: only COUNT and INFEASIBLE prove that no further diverse stuff was missed.
 const END_REASON = Object.freeze({ COUNT: "count", INFEASIBLE: "infeasible", DEADLINE: "deadline" });
-const RELATIVE_TOLERANCE = 1e-6;
-const ABSOLUTE_TOLERANCE = 1e-6;
-const PERCENT = 100;
 const SELECTED_THRESHOLD = 0.5;
 const SELECTED = 1;
 const NOT_SELECTED = 0;
-const NO_GAP = 0;
 // Shares of each stuff's time slice: the fast heuristic first, then the exact model (bound, proof, improvement).
 // Time left unused by either phase goes to the next stuffs.
 const HEURISTIC_SHARE = 0.75;
 const EXACT_SHARE = 0.25;
 // Share of the whole search the initial LP relaxation (first upper bound) may take.
 const RELAXATION_SHARE = 0.2;
-
-function isClearlyBelow(value, reference) {
-    return value < reference - ABSOLUTE_TOLERANCE - RELATIVE_TOLERANCE * Math.abs(reference);
-}
+// Share of the whole search for the LP bound tightening of the stats before the exact model is built.
+const BOUND_TIGHTENING_SHARE = 0.05;
 
 function logDebug(message) {
     if (IS_DEBUG) console.error(`🔍 ${message}`);
@@ -34,8 +30,14 @@ function logDebug(message) {
 
 // Streams diverse stuffs. Each one is the best stuff found under the diversity cuts of the previous ones, always
 // rescored by the exact evaluator; it is "optimal" only when its exact score reaches the upper bound proven by
-// HiGHS on the exact model, otherwise the remaining gap is reported. Only a proven infeasibility or the deadline
-// ends the search before resultCount stuffs. One StuffSolver runs one search.
+// HiGHS on the exact model, otherwise the remaining gap is reported. Each stuff's time slice goes to the heuristic,
+// then to the exact model. Skip path: once an exact phase ends on its time limit without beating the heuristic, the
+// later stuffs skip it and settle on the bound known so far, until a stuff is proven optimal again. On large models
+// the exact phase rarely helps, so its time goes to the heuristic. Only a proven infeasibility or the deadline
+// ends the search before resultCount stuffs; a search without any stuff at its deadline looks for a first one until
+// latestDeadlineMs. Each yield is { evaluation, solverStatus, optimalityGapPercent,
+// upperBound }, upperBound being the bound valid for every stuff not yielded before it, or null when none is known.
+// One StuffSolver runs one search.
 class StuffSolver {
     static SOLVER_STATUS = SOLVER_STATUS;
     static END_REASON = END_REASON;
@@ -71,15 +73,15 @@ class StuffSolver {
         return this.#endReason;
     }
 
-    async *solveDiverse({ deadlineMs, warmStart = [] }) {
-        const search = this.#createSearch(deadlineMs, warmStart);
+    async *solveDiverse({ deadlineMs, latestDeadlineMs = deadlineMs, warmStart = [] }) {
+        const search = this.#createSearch({ deadlineMs, latestDeadlineMs }, warmStart);
         this.#search = search;
-        if (this.#nowFn() >= search.deadlineMs) {
+        if (this.#nowFn() >= this.#findEndMs(search)) {
             yield* this.#yieldPoolFallbacks(search);
             this.#endReason = END_REASON.DEADLINE;
             return;
         }
-        const exact = await this.#createExactSolver();
+        const exact = await this.#createExactSolver(search);
         try {
             this.#endReason = yield* this.#solveAll(exact, search);
         } finally {
@@ -102,12 +104,15 @@ class StuffSolver {
             search.yieldedItems.push(found.evaluation.items);
             search.cuts.diverseFrom.push(found.evaluation.items);
             exact.cutBuilder.addDiversityCut(found.evaluation.items, this.#query.minDifferentItems);
+            // A proven stuff shows that the exact model can be solved within a share, and the diversity cut has
+            // just changed it: the next stuff tries its exact phase again.
+            if (found.solverStatus === SOLVER_STATUS.OPTIMAL) search.isExactPhaseUseful = true;
             await yieldToEventLoop();
         }
         return END_REASON.COUNT;
     }
 
-    #createSearch(deadlineMs, warmStart) {
+    #createSearch({ deadlineMs, latestDeadlineMs }, warmStart) {
         const pool = warmStart
             .filter((items) => this.#validator.isAllowed(items))
             .map((items) => this.#evaluator.evaluate(items))
@@ -115,6 +120,7 @@ class StuffSolver {
             .sort((first, second) => second.score - first.score);
         return {
             deadlineMs: deadlineMs - SOLVER_DEADLINE_MARGIN_MS,
+            latestDeadlineMs: Math.max(deadlineMs, latestDeadlineMs) - SOLVER_DEADLINE_MARGIN_MS,
             pool,
             yieldedItems: [],
             cuts: { excludedStuffs: [], diverseFrom: [] },
@@ -126,8 +132,14 @@ class StuffSolver {
         };
     }
 
-    async #createExactSolver() {
-        const model = new MilpModelBuilder(this.#problem).build();
+    async #createExactSolver(search) {
+        const tighteningMs = Math.min(
+            (search.deadlineMs - this.#nowFn()) * BOUND_TIGHTENING_SHARE,
+            MAX_BOUND_TIGHTENING_MS,
+        );
+        const tightener = new BoundTightener({ problem: this.#problem, nowFn: this.#nowFn });
+        const statBounds = await tightener.tighten({ timeLimitMs: tighteningMs });
+        const model = new MilpModelBuilder({ ...this.#problem, statBounds }).build();
         logDebug(`Exact MILP built (${model.lpText.length} characters, relaxed criteria: ${model.hasRelaxedCriteria})`);
         const solver = await HighsSolver.create(model.lpText);
         const cutBuilder = new CutBuilder({
@@ -158,7 +170,7 @@ class StuffSolver {
             if (search.yieldedItems.length >= this.#query.resultCount) return;
             if (!this.#diversityRule.isDiverseFromAll(evaluation.items, search.yieldedItems)) continue;
             search.yieldedItems.push(evaluation.items);
-            yield { evaluation, solverStatus: SOLVER_STATUS.HEURISTIC, optimalityGapPercent: null };
+            yield { evaluation, ...Optimality.describe(evaluation.score, null), upperBound: null };
         }
     }
 
@@ -191,17 +203,18 @@ class StuffSolver {
     }
 
     // Solves until the solution's exact score matches the model, refining the model with cuts otherwise. Without
-    // any diverse stuff known, it keeps solving past its slice: only infeasibility or the deadline stops it.
-    // Returns the next stuff, or the END_REASON that stops the search.
+    // any diverse stuff known, it keeps solving past its slice: only infeasibility or the end of the search stops it,
+    // and past the deadline the first solution does. Returns the next stuff, or the END_REASON that stops the search.
     #solveExact(exact, search, sliceEndMs) {
         for (;;) {
             this.#applyExclusions(exact, search);
             const hasCandidate = this.#findBestDiverse(search) !== undefined;
-            const endMs = hasCandidate ? Math.min(sliceEndMs, search.deadlineMs) : search.deadlineMs;
-            const remainingMs = endMs - this.#nowFn();
-            if (remainingMs <= 0) return this.#settle(search) ?? END_REASON.DEADLINE;
+            const endMs = hasCandidate ? Math.min(sliceEndMs, search.deadlineMs) : this.#findEndMs(search);
+            const now = this.#nowFn();
+            if (endMs <= now) return this.#settle(search) ?? END_REASON.DEADLINE;
             const start = this.#buildStart(exact.model.itemModel, search);
-            const result = exact.solver.solve({ timeLimitMs: remainingMs, start });
+            const stopAtSolutionAfterMs = search.deadlineMs - now;
+            const result = exact.solver.solve({ timeLimitMs: endMs - now, start, stopAtSolutionAfterMs });
             logDebug(`HiGHS ${result.status}: objective ${result.objective}, bound ${result.dualBound}`);
             if (result.status === HighsSolver.STATUS.INFEASIBLE) return END_REASON.INFEASIBLE;
             search.upperBound = Math.min(search.upperBound, result.dualBound);
@@ -216,6 +229,12 @@ class StuffSolver {
             if (!isClearlyBelow(evaluation.score, result.objective)) return this.#settle(search) ?? END_REASON.DEADLINE;
             exact.cutBuilder.boundStuff(evaluation.items, evaluation.score);
         }
+    }
+
+    // A search without any stuff yet may run until the latest deadline for its first one; then it keeps its own.
+    #findEndMs(search) {
+        const hasStuff = search.yieldedItems.length > 0 || this.#findBestDiverse(search) !== undefined;
+        return hasStuff ? search.deadlineMs : search.latestDeadlineMs;
     }
 
     #distrustModel(search, evaluation) {
@@ -257,16 +276,10 @@ class StuffSolver {
     #settle(search) {
         const evaluation = this.#findBestDiverse(search);
         if (!evaluation) return null;
-        const upperBound = search.upperBound;
-        if (isClearlyBelow(upperBound, evaluation.score)) this.#distrustModel(search, evaluation);
-        if (!search.isModelTrusted || !Number.isFinite(upperBound)) {
-            return { evaluation, solverStatus: SOLVER_STATUS.HEURISTIC, optimalityGapPercent: null };
-        }
-        if (!isClearlyBelow(evaluation.score, upperBound)) {
-            return { evaluation, solverStatus: SOLVER_STATUS.OPTIMAL, optimalityGapPercent: NO_GAP };
-        }
-        const gapPercent = (PERCENT * (upperBound - evaluation.score)) / Math.abs(upperBound);
-        return { evaluation, solverStatus: SOLVER_STATUS.GAP, optimalityGapPercent: gapPercent };
+        if (isClearlyBelow(search.upperBound, evaluation.score)) this.#distrustModel(search, evaluation);
+        const isBoundValid = search.isModelTrusted && Number.isFinite(search.upperBound);
+        const upperBound = isBoundValid ? search.upperBound : null;
+        return { evaluation, ...Optimality.describe(evaluation.score, upperBound), upperBound };
     }
 
     #buildStart(itemModel, search) {

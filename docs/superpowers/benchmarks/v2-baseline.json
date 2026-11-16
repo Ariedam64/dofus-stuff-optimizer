@@ -1,0 +1,68 @@
+[
+    {
+        "name": "cra-200-water",
+        "firstStuffMs": 6745,
+        "totalMs": 29570,
+        "bestScore": 4213.2,
+        "tenthScore": 3862.3,
+        "optimalCount": 0,
+        "bestGapPercent": null,
+        "bestStatus": "heuristic",
+        "reason": null
+    },
+    {
+        "name": "iop-200-earth",
+        "firstStuffMs": 5903,
+        "totalMs": 30495,
+        "bestScore": 4122.1,
+        "tenthScore": 3728.3,
+        "optimalCount": 0,
+        "bestGapPercent": null,
+        "bestStatus": "heuristic",
+        "reason": null
+    },
+    {
+        "name": "sadida-120-air",
+        "firstStuffMs": 6565,
+        "totalMs": 53216,
+        "bestScore": 1630.1,
+        "tenthScore": 1584,
+        "optimalCount": 0,
+        "bestGapPercent": null,
+        "bestStatus": "heuristic",
+        "reason": null
+    },
+    {
+        "name": "eniripsa-60-fire",
+        "firstStuffMs": 3579,
+        "totalMs": 16289,
+        "bestScore": 667.1,
+        "tenthScore": 657.5,
+        "optimalCount": 0,
+        "bestGapPercent": null,
+        "bestStatus": "heuristic",
+        "reason": null
+    },
+    {
+        "name": "cra-200-water-one-ring-exo",
+        "firstStuffMs": 7123,
+        "totalMs": 21941,
+        "bestScore": 4134.4,
+        "tenthScore": 3561.8,
+        "optimalCount": 0,
+        "bestGapPercent": null,
+        "bestStatus": "heuristic",
+        "reason": null
+    },
+    {
+        "name": "impossible-cra-1-water",
+        "firstStuffMs": null,
+        "totalMs": 1145,
+        "bestScore": null,
+        "tenthScore": null,
+        "optimalCount": 0,
+        "bestGapPercent": null,
+        "bestStatus": null,
+        "reason": "no-valid-stuff"
+    }
+]

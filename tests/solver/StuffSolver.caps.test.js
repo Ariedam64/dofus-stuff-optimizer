@@ -4,14 +4,11 @@ const StuffSolver = require("../../src/solver/StuffSolver");
 const { CHARACTERISTIC } = require("../../src/stats/characteristics");
 const { SLOT } = require("../../src/data/slots");
 const { MAX_AP } = require("../../src/config");
-const { buildRandomCase } = require("./randomCases");
+const { buildRandomCase, HIGH_AP_SEEDS, HIGH_AP_SCALE } = require("./randomCases");
 const { buildSpell, buildItem, buildContext, bruteForce, collect } = require("./solverFixture");
 
 const LONG_DEADLINE_MS = 120000;
 const SCORE_TOLERANCE = 1e-6;
-// Seeds whose valid stuffs include raw AP totals above the cap once AP and MP item stats are scaled up.
-const HIGH_AP_SEEDS = [3001, 3002, 3007, 3009, 3010, 3011, 3014, 3015];
-const HIGH_AP_SCALE = 6;
 // The bare character has 7 AP at level 200: this amulet reaches the 12 AP cap on its own.
 const CAP_AMULET_AP = MAX_AP - 7;
 const EXTRA_AP = 1;

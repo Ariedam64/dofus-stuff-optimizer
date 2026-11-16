@@ -4,6 +4,7 @@ const DofusDbClient = require("../sync/DofusDbClient");
 const SyncManager = require("../sync/SyncManager");
 const GameData = require("../data/GameData");
 const OptimizationManager = require("../optimizer/OptimizationManager");
+const SolverWorkerPool = require("../optimizer/SolverWorkerPool");
 
 const COMMAND_SYNC = "sync";
 const COMMAND_OPTIMIZE = "optimize";
@@ -50,10 +51,28 @@ class CommandLine {
     async #runOptimize(queryPath) {
         if (!queryPath) throw new Error("Missing --query <file.json>");
         const queryJson = await this.#readQueryFile(queryPath);
-        const gameData = await GameData.load(this.#config.DATA_DIR);
-        const result = await this.#createManager(gameData).run(queryJson);
+        const result = await this.#optimize(queryJson);
         this.#stdout.write(`${JSON.stringify(result, null, JSON_INDENT)}\n`);
         this.#logOutcome(result);
+    }
+
+    // The solver workers load their game data while this thread loads its own, so the time limit of the search is not
+    // spent on loading.
+    async #optimize(queryJson) {
+        const config = this.#config;
+        const workerPool = new SolverWorkerPool({ config, logger: this.#logger });
+        try {
+            const [gameData] = await Promise.all([GameData.load(config.DATA_DIR), workerPool.start()]);
+            const manager = new OptimizationManager({
+                gameData,
+                config,
+                logger: this.#logger,
+                solverRunner: workerPool,
+            });
+            return await manager.run(queryJson);
+        } finally {
+            await workerPool.close();
+        }
     }
 
     // The web server is only loaded by the web command.
@@ -61,15 +80,20 @@ class CommandLine {
         const WebServer = require("../web/WebServer");
         const config = this.#config;
         const gameData = await GameData.load(config.DATA_DIR);
+        const manager = this.#createManager(gameData);
         const server = new WebServer({
             gameData,
-            manager: this.#createManager(gameData),
+            manager,
             host: config.WEB_HOST,
             port: config.WEB_PORT,
             publicDir: config.PUBLIC_DIR,
             breeds: gameData.breeds,
         });
         await server.start();
+        // The page is usable at once; the solver workers load their game data meanwhile, before the first search.
+        manager
+            .startWorkers()
+            .catch((error) => this.#logger.error(`❌ Cannot start the solver workers: ${error.message}`));
     }
 
     #createManager(gameData) {

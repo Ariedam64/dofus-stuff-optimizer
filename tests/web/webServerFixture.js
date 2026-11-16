@@ -17,6 +17,7 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 
 class StubManager {
     calls = [];
+    isClosed = false;
     behavior = async (_query, { onStuff }) => {
         onStuff(1, { score: 10 });
         onStuff(2, { score: 9 });
@@ -26,6 +27,7 @@ class StubManager {
             unsupportedItems: [],
             unobtainableItems: [],
             ignoredSpells: [],
+            results: [{ score: 10 }, { score: 9 }],
             extra: 1,
         };
     };
@@ -33,6 +35,10 @@ class StubManager {
     async runStreaming(query, hooks) {
         this.calls.push({ query, signal: hooks.signal });
         return this.behavior(query, hooks);
+    }
+
+    async close() {
+        this.isClosed = true;
     }
 }
 

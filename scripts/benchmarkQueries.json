@@ -1,0 +1,32 @@
+[
+    {
+        "name": "cra-200-water",
+        "query": { "breed": "Crâ", "level": 200, "profile": { "elements": ["water"] }, "constraints": { "minAp": 11, "minMp": 6 } }
+    },
+    {
+        "name": "iop-200-earth",
+        "query": { "breed": "Iop", "level": 200, "profile": { "elements": ["earth"] }, "constraints": { "minAp": 11, "minMp": 6 } }
+    },
+    {
+        "name": "sadida-120-air",
+        "query": { "breed": "Sadida", "level": 120, "profile": { "elements": ["air"] }, "constraints": { "minAp": 9, "minMp": 5 } }
+    },
+    {
+        "name": "eniripsa-60-fire",
+        "query": { "breed": "Eniripsa", "level": 60, "profile": { "elements": ["fire"] } }
+    },
+    {
+        "name": "cra-200-water-one-ring-exo",
+        "query": {
+            "breed": "Crâ",
+            "level": 200,
+            "profile": { "elements": ["water"] },
+            "constraints": { "minAp": 12, "minMp": 6 },
+            "ringExos": { "ap": true, "mp": false }
+        }
+    },
+    {
+        "name": "impossible-cra-1-water",
+        "query": { "breed": "Crâ", "level": 1, "profile": { "elements": ["water"] }, "constraints": { "minAp": 12, "minMp": 6 } }
+    }
+]

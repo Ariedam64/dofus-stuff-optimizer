@@ -37,7 +37,7 @@ class DamageModel {
         this.#apUpper = Math.max(0, Math.min(this.#rawApUpper, MAX_AP));
     }
 
-    // spellGroups: Action[][]; weapons: [{ variable, action }]. Returns the turn damage expression.
+    // spellGroups: Action[][]; weapons: [{ item, variable, action }]. Returns the turn damage expression.
     build({ spellGroups, weapons }) {
         spellGroups.forEach((group, groupIndex) => {
             const groupCasts = new LinearExpression();
@@ -46,8 +46,8 @@ class DamageModel {
             });
             if (!groupCasts.isConstant) this.#writer.addConstraint(groupCasts, SENSE.AT_MOST, SINGLE_GROUP_CAST);
         });
-        for (const { variable, action } of weapons) {
-            const weaponCasts = this.#addAction(`w${variable}`, action);
+        for (const { item, variable, action } of weapons) {
+            const weaponCasts = this.#addAction(`w${variable}`, action, item);
             if (!weaponCasts.isConstant) {
                 this.#writer.addConstraint(weaponCasts.addTerm(variable, -1), SENSE.AT_MOST);
             }
@@ -75,13 +75,13 @@ class DamageModel {
         this.#writer.addConstraint(castingRow, SENSE.AT_MOST);
     }
 
-    // Returns the sum of the cast-count binaries of the action.
-    #addAction(id, action) {
+    // Returns the sum of the cast-count binaries of the action; a weapon action is only cast with its weapon worn.
+    #addAction(id, action, weapon = null) {
         const castBinaries = new LinearExpression();
         if (action.apCost <= 0) return castBinaries;
         const maxCount = Math.min(action.maxCasts, Math.floor(this.#apUpper / action.apCost));
         if (maxCount < 1) return castBinaries;
-        const expected = this.#expectedDamageModel.addExpectedDamage(id, action);
+        const expected = this.#expectedDamageModel.addExpectedDamage(id, action, weapon);
         const castDamage = this.#classOf(action);
         const castSum = new LinearExpression();
         for (let count = 1; count <= maxCount; count++) {
@@ -97,8 +97,8 @@ class DamageModel {
             this.#castTerms.addTerm(binary, count * action.apCost);
         }
         this.#writer.addConstraint(castSum.addTerm(expected.variable, -1), SENSE.AT_MOST);
-        castDamage.uppers.push(maxCount * expected.upper);
-        castDamage.ratios.push(expected.upper / action.apCost);
+        const castBound = { upper: expected.upper, apCost: action.apCost, maxCount };
+        (weapon ? castDamage.weaponCasts : castDamage.spellCasts).push(castBound);
         return castBinaries;
     }
 
@@ -106,16 +106,19 @@ class DamageModel {
         const percentCharacteristics = findPercentCharacteristics(action);
         const key = percentCharacteristics.join("_");
         if (!this.#classes.has(key)) {
-            this.#classes.set(key, { percentCharacteristics, damage: new LinearExpression(), uppers: [], ratios: [] });
+            this.#classes.set(key, {
+                percentCharacteristics,
+                damage: new LinearExpression(),
+                spellCasts: [],
+                weaponCasts: [],
+            });
         }
         return this.#classes.get(key);
     }
 
     // class damage = sum of casts × (1 + kind % / 100) × (1 + range % / 100)
-    #addClassDamage(key, { percentCharacteristics, damage: castDamage, uppers, ratios }) {
-        const sumUpper = uppers.reduce((total, value) => total + value, 0);
-        const apUpper = this.#apUpper * Math.max(0, ...ratios);
-        let damage = this.#addBoundedSum(`g${key}`, castDamage, Math.min(sumUpper, apUpper));
+    #addClassDamage(key, { percentCharacteristics, damage: castDamage, spellCasts, weaponCasts }) {
+        let damage = this.#addBoundedSum(`g${key}`, castDamage, this.#boundCastDamage(spellCasts, weaponCasts));
         for (const characteristic of percentCharacteristics) {
             const expansion = this.#expandPercent(characteristic);
             const scaled = this.#linearizer.multiplyByExpandedInteger(`f${key}_${characteristic}`, expansion, damage);
@@ -124,6 +127,26 @@ class DamageModel {
             damage = this.#addBoundedSum(`h${key}_${characteristic}`, factored, bounds.upper, bounds.lower);
         }
         return damage;
+    }
+
+    // Fractional knapsack over the AP budget: casts sorted by damage per AP fill it, each up to its cast count.
+    // Only one weapon is worn, so the weapon casts add the best single weapon.
+    #boundCastDamage(spellCasts, weaponCasts) {
+        const fillBudget = (casts) => {
+            let remainingAp = this.#apUpper;
+            let total = 0;
+            const byRatio = [...casts].sort(
+                (first, second) => second.upper / second.apCost - first.upper / first.apCost,
+            );
+            for (const { upper, apCost, maxCount } of byRatio) {
+                const count = Math.min(maxCount, remainingAp / apCost);
+                total += count * upper;
+                remainingAp -= count * apCost;
+            }
+            return total;
+        };
+        const weaponBound = Math.max(0, ...weaponCasts.map((cast) => fillBudget([cast])));
+        return fillBudget(spellCasts) + weaponBound;
     }
 
     #addBoundedSum(name, expression, upper, lower = 0) {

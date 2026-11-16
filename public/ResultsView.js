@@ -18,6 +18,7 @@ class ResultsView {
     #elements;
     #element = null;
     #cards = [];
+    #resultCount = Infinity;
     #startedAt = 0;
     #foundCount = 0;
     #timerId = null;
@@ -36,8 +37,10 @@ class ResultsView {
         return this.#isRunning;
     }
 
-    start(elementKey) {
+    // resultCount: how many cards the search may show; the server streams stuffs that a better one may push out later.
+    start(elementKey, resultCount = Infinity) {
         this.#element = this.#elements.find((element) => element.key === elementKey) ?? { key: elementKey, label: "" };
+        this.#resultCount = resultCount;
         this.#cards = [];
         this.#foundCount = 0;
         this.#startedAt = Date.now();
@@ -51,22 +54,26 @@ class ResultsView {
     }
 
     updateProgress({ foundCount }) {
-        this.#foundCount = Math.max(this.#foundCount, foundCount ?? 0);
+        this.#foundCount = Math.min(Math.max(this.#foundCount, foundCount ?? 0), this.#resultCount);
         this.#renderRunningStatus();
     }
 
+    // Keeps the resultCount best cards, sorted by score.
     addStuff(stuff) {
         const card = new StuffCard({ stuff, element: this.#element });
         const nextCard = this.#cards.find((existing) => existing.score < card.score);
         const insertIndex = nextCard ? this.#cards.indexOf(nextCard) : this.#cards.length;
         this.#cards.splice(insertIndex, 0, card);
-        this.#stuffList.insertBefore(card.root, nextCard?.root ?? null);
-        this.#cards.forEach((existing, index) => (existing.rank = index + 1));
+        this.#showCards(this.#cards.slice(0, this.#resultCount));
         this.#foundCount = Math.max(this.#foundCount, this.#cards.length);
         this.#renderRunningStatus();
     }
 
+    // done.results, when given, is the final list (best first, final statuses): it replaces the streamed cards.
     finish(done) {
+        if (Array.isArray(done.results)) {
+            this.#showCards(done.results.map((stuff) => new StuffCard({ stuff, element: this.#element })));
+        }
         this.#stop();
         const [state, text] = this.#describeOutcome(done);
         this.#setStatus(state, text);
@@ -84,6 +91,12 @@ class ResultsView {
     showError(message) {
         this.#stop();
         this.#setStatus(STATUS_STATES.error, `\u274C ${message}`);
+    }
+
+    #showCards(cards) {
+        this.#cards = cards;
+        this.#stuffList.replaceChildren(...cards.map((card) => card.root));
+        cards.forEach((card, index) => (card.rank = index + 1));
     }
 
     #stop() {

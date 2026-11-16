@@ -5,6 +5,8 @@ const { EXO_VALUE, EXO_CHARACTERISTICS } = require("../data/exos");
 
 const NOT_WORN = 0;
 const EXO_PREFIXES = Object.freeze({ ap: "xa", mp: "xm" });
+// Fixed at 0: required to equal 1 when a weapon is required but no weapon is a candidate, so the model is infeasible.
+const NO_WEAPON_VARIABLE = "wnone";
 
 // Item choice variables and the rules that link them: slots, exclusions, exos and set item counts.
 class ItemModel {
@@ -47,6 +49,7 @@ class ItemModel {
 
     build() {
         for (const [slot, items] of this.#candidates) this.#addSlot(slot, items);
+        if (this.#query.isWeaponRequired) this.#requireWeapon();
         this.#addExclusions();
         this.#indexSets();
         this.#addRingExos();
@@ -85,6 +88,12 @@ class ItemModel {
             slotSum.addTerm(variable, 1);
         }
         if (!slotSum.isConstant) this.#writer.addConstraint(slotSum, SENSE.AT_MOST, SLOT_CAPACITIES[slot]);
+    }
+
+    #requireWeapon() {
+        const weaponSum = LinearExpression.sumOf(this.itemsOfSlot(SLOT.WEAPON).map((item) => this.variableOf(item)));
+        if (weaponSum.isConstant) weaponSum.addTerm(this.#writer.addVariable(NO_WEAPON_VARIABLE, { upper: 0 }), 1);
+        this.#writer.addConstraint(weaponSum, SENSE.EQUAL, 1);
     }
 
     #addExclusions() {

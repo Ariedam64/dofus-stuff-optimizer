@@ -180,6 +180,8 @@ class Query {
     useScrolls;
     minDifferentItems;
     timeLimitMs;
+    // Set only on the copy a weapon search partition uses: every stuff then wears one of the candidate weapons.
+    isWeaponRequired;
 
     constructor(fields) {
         this.breed = fields.breed;
@@ -197,6 +199,11 @@ class Query {
         this.useScrolls = fields.useScrolls;
         this.minDifferentItems = fields.minDifferentItems;
         this.timeLimitMs = fields.timeLimitMs;
+        this.isWeaponRequired = fields.isWeaponRequired ?? false;
+    }
+
+    withRequiredWeapon() {
+        return new Query({ ...this, isWeaponRequired: true });
     }
 
     // exoKey: a key of EXO_CHARACTERISTICS ("ap" / "mp").
